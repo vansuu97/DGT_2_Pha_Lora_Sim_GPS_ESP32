@@ -18,14 +18,14 @@
 #define CMD_PEAK_SETTING    0x03U
 
 #define FRAME_REALTIME_LEN        17U
-#define FRAME_NORMAL_SETTING_LEN  16U
+#define FRAME_NORMAL_SETTING_LEN  17U
 #define FRAME_PEAK_SETTING_LEN    16U
 #define FRAME_MAX_LEN             FRAME_REALTIME_LEN
 
 #define REALTIME_COUNTER_INDEX        15U
 #define REALTIME_CRC_INDEX            16U
-#define NORMAL_SETTING_COUNTER_INDEX  14U
-#define NORMAL_SETTING_CRC_INDEX      15U
+#define NORMAL_SETTING_COUNTER_INDEX  15U
+#define NORMAL_SETTING_CRC_INDEX      16U
 #define PEAK_SETTING_COUNTER_INDEX    14U
 #define PEAK_SETTING_CRC_INDEX        15U
 
@@ -79,6 +79,7 @@ uint8_t Hour = 1, Min = 1, Sec = 1;
 uint8_t Volt1 = 1, Volt2 = 1, Current1 = 1, Current2 = 1;
 
 /* Blink yellow and peak time setting */
+uint8_t BlinkYel_ENA1 = 0, BlinkYel_ENA2 = 0, Thaco_Blink = 0, CaoDiem_ENA = 0;
 uint8_t begin_hour1 = 0, begin_min1 = 0, end_hour1 = 0, end_min1 = 0;  // Chop vang 1
 uint8_t begin_hour2 = 0, begin_min2 = 0, end_hour2 = 0, end_min2 = 0;  // Chop vang 2
 uint8_t begin_hour3 = 0, begin_min3 = 0, end_hour3 = 0, end_min3 = 0;  // Cao diem
@@ -269,29 +270,26 @@ static String buildLogLine(void) {
                    " | I = " + String(Current1) + "." + twoDigit(Current2) +
                    " || Power = " + String(Power, 2) +
 
+                   " || ChopVang_ENA1 = " + String(BlinkYel_ENA1) +
                    " || ChopVang1 = " + twoDigit(begin_hour1) + ":" + twoDigit(begin_min1) +
                    "-" + twoDigit(end_hour1) + ":" + twoDigit(end_min1) +
+                   " || ChopVang_ENA2 = " + String(BlinkYel_ENA2) +
                    " || ChopVang2 = " + twoDigit(begin_hour2) + ":" + twoDigit(begin_min2) +
                    "-" + twoDigit(end_hour2) + ":" + twoDigit(end_min2) +
 
+                   " || CaoDiem_ENA = " + String(CaoDiem_ENA) +
                    " || CaoDiemTime = " + twoDigit(begin_hour3) + ":" + twoDigit(begin_min3) +
                    "-" + twoDigit(end_hour3) + ":" + twoDigit(end_min3) +
                    " || CaoDiem_X1 = " + String(CaoDiem_X1) +
                    " | CaoDiem_V1 = " + String(CaoDiem_V1) +
-                   " | CaoDiem_D1 = " + String(CaoDiem_GT1) +
+                   " | CaoDiem_GT1 = " + String(CaoDiem_GT1) +
                    " || CaoDiem_X2 = " + String(CaoDiem_X2) +
                    " | CaoDiem_V2 = " + String(CaoDiem_V2) +
-                   " | CaoDiem_D2 = " + String(CaoDiem_GT2) +
+                   " | CaoDiem_GT2 = " + String(CaoDiem_GT2) +
                    " || CaoDiem_X3 = " + String(CaoDiem_X3) +
                    " | CaoDiem_V3 = " + String(CaoDiem_V3) +
-                   " | CaoDiem_D3 = " + String(CaoDiem_GT3) +
-
-                   " || Counter RT/N/P = " + String(realtimeCounter) +
-                   "/" + String(normalCounter) +
-                   "/" + String(peakCounter) +
-                   " || CRC RT/N/P = " + crcHex(realtimeCrc) +
-                   "/" + crcHex(normalCrc) +
-                   "/" + crcHex(peakCrc);
+                   " | CaoDiem_GT3 = " + String(CaoDiem_GT3) +
+                   " | Thaco = " + String(Thaco_Blink);
 
   return newLine;
 }
@@ -345,29 +343,41 @@ static void decodeRealtimeFrame(const uint8_t *frame) {
 }
 
 static void decodeNormalSettingFrame(const uint8_t *frame) {
-  X1  = frame[1];
-  V1  = frame[2];
-  GT1 = frame[3];
+  const uint8_t controlFlags = frame[1];
 
-  X2  = frame[4];
-  V2  = frame[5];
-  GT2 = frame[6];
+  BlinkYel_ENA1 = (uint8_t)((controlFlags >> 0U) & 0x01U);
+  BlinkYel_ENA2 = (uint8_t)((controlFlags >> 1U) & 0x01U);
+  Thaco_Blink   = (uint8_t)((controlFlags >> 2U) & 0x01U);
+  CaoDiem_ENA   = (uint8_t)((controlFlags >> 3U) & 0x01U);
 
-  X3  = frame[7];
-  V3  = frame[8];
-  GT3 = frame[9];
+  X1  = frame[2];
+  V1  = frame[3];
+  GT1 = frame[4];
 
-  begin_hour2 = frame[10];
-  begin_min2  = frame[11];
-  end_hour2   = frame[12];
-  end_min2    = frame[13];
+  X2  = frame[5];
+  V2  = frame[6];
+  GT2 = frame[7];
+
+  X3  = frame[8];
+  V3  = frame[9];
+  GT3 = frame[10];
+
+  begin_hour2 = frame[11];
+  begin_min2  = frame[12];
+  end_hour2   = frame[13];
+  end_min2    = frame[14];
 
   normalCounter = frame[NORMAL_SETTING_COUNTER_INDEX];
   normalCrc = frame[NORMAL_SETTING_CRC_INDEX];
   normalReady = true;
 
   Serial.print("NORMAL_SETTING OK, Counter = ");
-  Serial.println(normalCounter);
+  Serial.print(normalCounter);
+  Serial.print(", Flags = 0x");
+  if (controlFlags < 0x10U) {
+    Serial.print('0');
+  }
+  Serial.println(controlFlags, HEX);
 }
 
 static void decodePeakSettingFrame(const uint8_t *frame) {
@@ -508,6 +518,5 @@ void loop() {
   } else {
     digitalWrite(LED_BUILTIN, LOW);  // LED ON
   }
-
   delay(1);
 }
