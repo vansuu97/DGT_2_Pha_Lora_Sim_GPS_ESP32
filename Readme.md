@@ -1,0 +1,1 @@
+This firmware is developed for the ESP32-S3 platform, enabling reliable data logging to an SD card and supporting server communication to retrieve data for transmission to an STM32 microcontroller.
